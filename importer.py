@@ -26,23 +26,13 @@ def create_graph(tx, blog):
     likes=blog["likes"]
     )
 
-    # # Create User nodes and the WROTE relationship (maybe we want this later?)
-    # tx.run("""
-    # MERGE (u:User {username: $username})
-    # WITH u, $blog_id AS blog_id
-    # MATCH (b:Blog {id: blog_id})
-    # MERGE (u)-[:WROTE]->(b)
-    # """, 
-    # username=blog["created"]["by"],
-    # blog_id=blog["_id"])
-
-    # Create likers and LIKES relationships
+    # Create likers and LIKED_BY relationships
     for liker in blog["likers"]:
         tx.run("""
         MERGE (l:User {username: $liker})
         WITH l, $blog_id AS blog_id
         MATCH (b:Blog {id: blog_id})
-        MERGE (l)-[:LIKES]->(b)
+        MERGE (l)<-[:LIKED_BY]-(b)
         """, 
         liker=liker,
         blog_id=blog["_id"])
@@ -62,22 +52,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# WIP query
-
-# MATCH (targetUser:User {username: "nushi"})-[:LIKES]->(likedBlog:Blog)
-# WITH targetUser, likedBlog
-# MATCH (likedBlog)<-[:LIKES]-(similarUser:User)
-# WHERE likedBlog.likes > 10
-# ORDER BY likedBlog.likes DESC
-# LIMIT 100
-# MATCH (similarUser)-[:LIKES]->(recommendedBlog:Blog)
-# WHERE NOT (targetUser)-[:LIKES]->(recommendedBlog)
-# RETURN DISTINCT recommendedBlog, COUNT(similarUser) AS similarityScore
-# ORDER BY similarityScore DESC
-# LIMIT 10
-
-
-# clear neo4j db
-# match (a) -[r] -> () delete a, r
-# match (a) delete a
