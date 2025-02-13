@@ -2,6 +2,7 @@
 
 from pymongo import MongoClient
 from neo4j import GraphDatabase
+from tqdm import tqdm
 
 # MongoDB connection
 mongo_client = MongoClient('mongodb://localhost:27017/')
@@ -40,12 +41,13 @@ def create_graph(tx, blog):
 def main():
     neo4j_driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_username, neo4j_password))
     
+    blog_count = collection.count_documents({"likes": { "$gt": 0 }})
+
     with neo4j_driver.session() as session:
         # Pull data from MongoDB (streamed)
-        blog_posts = collection.find()
-        # only import blogs with at least 1 like?
+        blog_posts = collection.find({"likes": { "$gt": 0 }}, {"_id": 1, "title": 1, "likes": 1, "likers": 1})
 
-        for blog in blog_posts:
+        for blog in tqdm(blog_posts, total=blog_count):
             session.execute_write(create_graph, blog)
 
     print("Data migration from MongoDB to Neo4j completed.")
