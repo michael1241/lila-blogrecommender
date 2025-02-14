@@ -22,8 +22,9 @@ CALL gds.nodeSimilarity.stream('blogsGraph')
   // Limit the results to the top 3 most similar blogs for each blog
   WITH blog1_id, COLLECT([blog2_id, similarity])[0..3] AS top3SimilarBlogs
   UNWIND top3SimilarBlogs AS top3
-  RETURN blog1_id, top3[0] AS blog2_id, top3[1] AS similarity
-  ORDER BY blog1_id, similarity DESC;
+  RETURN blog1_id AS _id, 
+         COLLECT({ _id: top3[0], similarity: top3[1] }) AS similarBlogs
+  ORDER BY _id;
 
 // clear the database if required
 
