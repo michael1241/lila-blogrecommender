@@ -44,6 +44,10 @@ def main():
     blog_count = collection.count_documents({"likes": { "$gt": 0 }})
 
     with neo4j_driver.session() as session:
+        # Create indexes for User.username and Blog.id
+        session.run("CREATE TEXT INDEX username_index IF NOT EXISTS FOR (u:User) ON (u.username);")
+        session.run("CREATE TEXT INDEX blog_index IF NOT EXISTS FOR (b:Blog) ON (b.id);")
+
         # Pull data from MongoDB (streamed)
         blog_posts = collection.find({"likes": { "$gt": 0 }}, {"_id": 1, "title": 1, "likes": 1, "likers": 1})
 
