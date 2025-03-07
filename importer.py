@@ -4,27 +4,26 @@ from pymongo import MongoClient
 from neo4j import GraphDatabase
 from tqdm import tqdm
 
-# MongoDB connection
 mongo_client = MongoClient('mongodb://localhost:27017/')
 mongo_db = mongo_client['lichess']
 collection = mongo_db["ublog_post"]
 
-# Neo4j connection
 neo4j_url = "bolt://localhost:7687"
 neo4j_username = "neo4j"
 neo4j_password = "your_neo4j_password"
-neo4j_db_name = "neo4j"
 
 def create_graph(tx, blog):
     # Create Blog node
     tx.run("""
     MERGE (b:Blog {id: $blog_id})
     SET b.title = $title,
-        b.likes = $likes
+        b.likes = $likes,
+        b.author = $author
     """, 
     blog_id=blog["_id"],
     title=blog["title"],
-    likes=blog["likes"]
+    likes=blog["likes"],
+    author=blog["blog"].split(':')[1]
     )
 
     # Create likers and LIKED_BY relationships
@@ -49,7 +48,7 @@ def main():
         session.run("CREATE TEXT INDEX blog_index IF NOT EXISTS FOR (b:Blog) ON (b.id);")
 
         # Pull data from MongoDB (streamed)
-        blog_posts = collection.find({"likes": { "$gt": 0 }}, {"_id": 1, "title": 1, "likes": 1, "likers": 1})
+        blog_posts = collection.find({"likes": { "$gt": 0 }}, {"_id": 1, "title": 1, "likes": 1, "likers": 1, "blog": 1})
 
         for blog in tqdm(blog_posts, total=blog_count):
             session.execute_write(create_graph, blog)
