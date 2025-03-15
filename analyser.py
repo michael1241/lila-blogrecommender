@@ -1,7 +1,12 @@
 #! /usr/bin/env python3
 
 from neo4j import GraphDatabase
+from pymongo import MongoClient
 import csv
+
+mongo_client = MongoClient('mongodb://localhost:27017/')
+mongo_db = mongo_client['lichess']
+collection = mongo_db["ublog_post"]
 
 neo4j_url = "bolt://localhost:7687"
 neo4j_username = "neo4j"
@@ -14,7 +19,7 @@ def run_query(driver, query):
         result = list(session.run(query))
         return result
 
-def main():
+def main(output_type):
     query = """
     CALL gds.nodeSimilarity.stream('blogsGraph', {topK:30})
       YIELD node1, node2, similarity
@@ -32,12 +37,12 @@ def main():
       UNWIND similarBlogs AS pair
       WITH blog1_id, blog1_likes, pair[0] AS blog2_id, pair[1] AS similarity
       ORDER BY blog1_id, similarity DESC
-      // Limit the results to the top 3 most similar blogs for each blog
-      WITH blog1_id, blog1_likes, COLLECT([blog2_id, similarity])[0..3] AS top3SimilarBlogs
-      UNWIND top3SimilarBlogs AS top3
+      // Limit the results to the top 5 most similar blogs for each blog
+      WITH blog1_id, blog1_likes, COLLECT([blog2_id, similarity])[0..5] AS top5SimilarBlogs
+      UNWIND top5SimilarBlogs AS top5
       RETURN blog1_id AS _id, 
              blog1_likes AS likes, 
-             COLLECT({ _id: top3[0], similarity: top3[1] }) AS similarBlogs
+             COLLECT({ _id: top5[0], similarity: top5[1] }) AS similarBlogs
       ORDER BY likes DESC;
     """
 
@@ -49,22 +54,28 @@ def main():
     );
     """
 
-    run_query(driver, "CALL gds.graph.drop('blogsGraph');")
+    #generate fresh projection
+    if run_query(driver, "CALL gds.graph.exists('blogsGraph')")[0]['exists']:
+        run_query(driver, "CALL gds.graph.drop('blogsGraph');")
     run_query(driver, projection)
     result = run_query(driver, query)
 
-    with open('output.csv', 'w', newline='') as csvfile:
-        fieldnames = ['_id', 'likes', 'similarBlogs']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    match output_type:
+        case 'csv':
+            with open('output.csv', 'w', newline='') as csvfile:
+                fieldnames = ['_id', 'likes', 'similarBlogs']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-        writer.writeheader()
-        for record in result:
-            writer.writerow({
-                '_id': record['_id'],
-                'likes': record['likes'],
-                'similarBlogs': record['similarBlogs']
-            })
-
+                writer.writeheader()
+                for record in result:
+                    writer.writerow({
+                        '_id': record['_id'],
+                        'likes': record['likes'],
+                        'similarBlogs': record['similarBlogs']
+                    })
+        case 'mongo':
+            for record in result:
+                collection.update_one({'_id': record['_id']}, {'$set': {'similarByLikes': [b['_id'] for b in record['similarBlogs']]}}, upsert=True)
 
 if __name__ == "__main__":
-    main()
+    main('mongo')
