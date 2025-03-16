@@ -1,18 +1,10 @@
 #! /usr/bin/env python3
 
-from pymongo import MongoClient
-from neo4j import GraphDatabase
 from tqdm import tqdm
+import logging
+logger = logging.getLogger(__name__)
 
-mongo_client = MongoClient('mongodb://localhost:27017/')
-mongo_db = mongo_client['lichess']
-collection = mongo_db["ublog_post"]
-
-neo4j_url = "bolt://localhost:7687"
-neo4j_username = "neo4j"
-neo4j_password = "your_neo4j_password"
-
-def create_graph(tx, blog):
+def blog_upsert(tx, blog):
     # Create Blog node
     tx.run("""
     MERGE (b:Blog {id: $blog_id})
@@ -37,23 +29,29 @@ def create_graph(tx, blog):
         liker=liker,
         blog_id=blog["_id"])
 
-def main():
-    neo4j_driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_username, neo4j_password))
-    
-    blog_count = collection.count_documents({"likes": { "$gt": 0 }})
+def likes_update(tx, blog, likers):
+    for liker in likers:
+        tx.run("""
+        MERGE (l:User {username: $liker})
+        WITH l, $blog_id AS blog_id
+        MATCH (b:Blog {id: blog_id})
+        MERGE (l)<-[:LIKED_BY]-(b)
+        """, 
+        liker=liker,
+        blog_id=blog["_id"])
 
-    with neo4j_driver.session() as session:
-        # Create indexes for User.username and Blog.id
-        session.run("CREATE TEXT INDEX username_index IF NOT EXISTS FOR (u:User) ON (u.username);")
-        session.run("CREATE TEXT INDEX blog_index IF NOT EXISTS FOR (b:Blog) ON (b.id);")
+def load_all_mongo_to_neo4j(session, mongo_collection):
 
-        # Pull data from MongoDB (streamed)
-        blog_posts = collection.find({"likes": { "$gt": 0 }}, {"_id": 1, "title": 1, "likes": 1, "likers": 1, "blog": 1})
+    blog_count = mongo_collection.count_documents({"likes": { "$gt": 0 }})
 
-        for blog in tqdm(blog_posts, total=blog_count):
-            session.execute_write(create_graph, blog)
+    # Create indexes for User.username and Blog.id
+    session.run("CREATE TEXT INDEX username_index IF NOT EXISTS FOR (u:User) ON (u.username);")
+    session.run("CREATE TEXT INDEX blog_index IF NOT EXISTS FOR (b:Blog) ON (b.id);")
 
-    print("Data migration from MongoDB to Neo4j completed.")
+    # Pull data from MongoDB (streamed)
+    blog_posts = mongo_collection.find({"likes": { "$gt": 0 }}, {"_id": 1, "title": 1, "likes": 1, "likers": 1, "blog": 1})
 
-if __name__ == "__main__":
-    main()
+    for blog in tqdm(blog_posts, total=blog_count):
+        session.execute_write(blog_upsert, blog)
+
+    logger.info(f"Data ingestion of {blog_count} blogs from from MongoDB to Neo4j completed.")
