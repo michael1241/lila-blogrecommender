@@ -19,7 +19,7 @@ def run_query(driver, query):
         result = list(session.run(query))
         return result
 
-def main(output_type):
+def analyse(output_type):
     query = """
     CALL gds.nodeSimilarity.stream('blogsGraph', {topK:30})
       YIELD node1, node2, similarity
@@ -76,6 +76,5 @@ def main(output_type):
         case 'mongo':
             for record in result:
                 collection.update_one({'_id': record['_id']}, {'$set': {'similarByLikes': [b['_id'] for b in record['similarBlogs']]}}, upsert=True)
-
-if __name__ == "__main__":
-    main('mongo')
+        case 'server':
+            return {r['_id']: r['similarBlogs'] for r in result}

@@ -7,6 +7,7 @@ import threading
 import logging
 
 import importer
+import analyser
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -15,8 +16,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 
 # establish connections
-app = Flask(__name__)
-
 mongo_client = MongoClient('mongodb://localhost:27017/')
 mongo_db = mongo_client['lichess']
 mongo_collection = mongo_db["ublog_post"]
@@ -28,13 +27,15 @@ neo4j_password = "your_neo4j_password"
 neo4j_driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_username, neo4j_password))
 neo4j_session = neo4j_driver.session()
 
-#importer.load_all_mongo_to_neo4j(neo4j_session, mongo_collection)
-
-
 # set up API routes
+app = Flask(__name__)
 
+@app.route('/similarblogs/<blog_id>', methods=['GET'])
+def similar_blogs(blog_id):
+    return similarities.get(blog_id)
 
 # set up mongodb change streams (requires replica set mongo) and update neo4j
+# fields used will always be present https://github.com/lichess-org/lila/blob/fancy-bots/modules/ublog/src/main/UblogPost.scala#L9-L29
 def watch_blogs():
     logger.info("Watching for new blogs...")
     change_stream = mongo_collection.watch([{'$match': {'operationType': 'insert'}}])
@@ -56,12 +57,16 @@ def watch_likes():
                 break
         neo4j_session.execute_write(importer.likes_update, change['documentKey'], likers) # doesn't edit like count
 
-# TODO maybe log likes of older blogs to measure impact of recommendations?
-
-
 if __name__ == "__main__":
-#     # Run the Flask app
-#     threading.Thread(target=lambda: app.run(debug=True, use_reloader=False)).start()
+
+    # Full database load
+    # importer.load_all_mongo_to_neo4j(neo4j_session, mongo_collection)
+
+    # Generate graph projection and get blog: similar blogs, similarity
+    similarities = analyser.analyse('server')
+
+    # Run the Flask app
+    threading.Thread(target=lambda: app.run(debug=True, use_reloader=False)).start()
     
     blog_thread = threading.Thread(target=watch_blogs)
     like_thread = threading.Thread(target=watch_likes)
