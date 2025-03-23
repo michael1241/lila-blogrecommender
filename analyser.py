@@ -2,7 +2,7 @@
 
 def analyse(session):
     query = """
-    CALL gds.nodeSimilarity.stream('blogsGraph', {topK:30})
+    CALL gds.nodeSimilarity.stream('blogsGraph', {topK:30, similarityMetric:"COSINE"})
       YIELD node1, node2, similarity
       WITH gds.util.asNode(node1).id AS blog1_id, 
            gds.util.asNode(node2).id AS blog2_id, 
