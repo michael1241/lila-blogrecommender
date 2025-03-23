@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from flask import Flask
+from flask import Flask, abort
 from pymongo import MongoClient
 from neo4j import GraphDatabase
 import threading
@@ -37,7 +37,7 @@ def similar_blogs(blog_id):
     if blog_similarities := similarities.get(blog_id):
         return blog_similarities
     else:
-        return "No blog found"
+        abort(404)
 
 # set up mongodb change streams (requires replica set mongo) and update neo4j
 # fields used will always be present https://github.com/lichess-org/lila/blob/fancy-bots/modules/ublog/src/main/UblogPost.scala#L9-L29
