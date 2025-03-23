@@ -74,7 +74,7 @@ def reload_database_task():
 def generate_graph_projection():
     global similarities
     logger.info("Generating graph projection...")
-    similarities = analyser.analyse('server')
+    similarities = analyser.analyse(neo4j_session)
 
 def generate_graph_projection_task():
     generate_graph_projection()

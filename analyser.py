@@ -1,25 +1,6 @@
 #! /usr/bin/env python3
 
-from neo4j import GraphDatabase
-from pymongo import MongoClient
-import csv
-
-mongo_client = MongoClient('mongodb://localhost:27017/')
-mongo_db = mongo_client['lichess']
-collection = mongo_db["ublog_post"]
-
-neo4j_url = "bolt://localhost:7687"
-neo4j_username = "neo4j"
-neo4j_password = "your_neo4j_password"
-
-driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_username, neo4j_password))
-
-def run_query(driver, query):
-    with driver.session() as session:
-        result = list(session.run(query))
-        return result
-
-def analyse(output_type):
+def analyse(session):
     query = """
     CALL gds.nodeSimilarity.stream('blogsGraph', {topK:30})
       YIELD node1, node2, similarity
@@ -55,26 +36,8 @@ def analyse(output_type):
     """
 
     #generate fresh projection
-    if run_query(driver, "CALL gds.graph.exists('blogsGraph')")[0]['exists']:
-        run_query(driver, "CALL gds.graph.drop('blogsGraph');")
-    run_query(driver, projection)
-    result = run_query(driver, query)
+    if list(session.run("CALL gds.graph.exists('blogsGraph')"))[0]['exists']:
+        session.run("CALL gds.graph.drop('blogsGraph');")
+    session.run(projection)
 
-    match output_type:
-        case 'csv':
-            with open('output.csv', 'w', newline='') as csvfile:
-                fieldnames = ['_id', 'likes', 'similarBlogs']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-                writer.writeheader()
-                for record in result:
-                    writer.writerow({
-                        '_id': record['_id'],
-                        'likes': record['likes'],
-                        'similarBlogs': record['similarBlogs']
-                    })
-        case 'mongo':
-            for record in result:
-                collection.update_one({'_id': record['_id']}, {'$set': {'similarByLikes': [b['_id'] for b in record['similarBlogs']]}}, upsert=True)
-        case 'server':
-            return {r['_id']: r['similarBlogs'] for r in result}
+    return {r['_id']: r['similarBlogs'] for r in session.run(query)}
