@@ -40,7 +40,11 @@ def likes_update(tx, blog, likers):
         liker=liker,
         blog_id=blog["_id"])
 
-def load_all_mongo_to_neo4j(session, mongo_collection):
+def reload_all_mongo_to_neo4j(session, mongo_collection):
+
+    # Delete existing data
+    session.run("MATCH (a) -[r] -> () DELETE a, r;")
+    session.run("MATCH (a) DELETE a;")
 
     blog_count = mongo_collection.count_documents({"likes": { "$gt": 0 }})
 
