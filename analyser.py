@@ -19,11 +19,11 @@ def analyse(session):
       WITH blog1_id, blog1_likes, pair[0] AS blog2_id, pair[1] AS similarity
       ORDER BY blog1_id, similarity DESC
       // Limit the results to the top 5 most similar blogs for each blog
-      WITH blog1_id, blog1_likes, COLLECT([blog2_id, similarity])[0..5] AS top5SimilarBlogs
-      UNWIND top5SimilarBlogs AS top5
+      WITH blog1_id, blog1_likes, COLLECT([blog2_id, similarity])[0..20] AS top20SimilarBlogs
+      UNWIND top20SimilarBlogs AS top20
       RETURN blog1_id AS _id, 
              blog1_likes AS likes, 
-             COLLECT({ _id: top5[0], similarity: top5[1] }) AS similarBlogs
+             COLLECT({ _id: top20[0], similarity: top20[1] }) AS similarBlogs
       ORDER BY likes DESC;
     """
 

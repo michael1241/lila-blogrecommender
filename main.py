@@ -20,12 +20,12 @@ logging.basicConfig(
 logger.info("Starting up...")
 
 # establish connections
-mongo_uri = os.environ.get("MONGODB_URI") or "mongodb://host.docker.internal:27017/"
+mongo_uri = os.environ.get("MONGODB_URI") or "mongodb://localhost:27017/"
 mongo_client = MongoClient(mongo_uri)
 mongo_db = mongo_client['lichess']
 mongo_collection = mongo_db["ublog_post"]
 
-neo4j_url = os.environ.get("NEO4J_URI") or "bolt://host.docker.internal:7687"
+neo4j_url = os.environ.get("NEO4J_URI") or "bolt://localhost:7687"
 neo4j_driver = GraphDatabase.driver(neo4j_url)
 neo4j_session = neo4j_driver.session()
 
