@@ -60,8 +60,8 @@ def watch_likes():
         for k in updated_fields:
             if k.startswith('likers'):
                 likers = updated_fields[k]
+                neo4j_session.execute_write(importer.likes_update, change['documentKey'], likers) # doesn't edit like count
                 break
-        neo4j_session.execute_write(importer.likes_update, change['documentKey'], likers) # doesn't edit like count
 
 # Scheduler functions
 def reload_database():
